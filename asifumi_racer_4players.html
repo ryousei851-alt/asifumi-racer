@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>あしぶみレーサー 4人対戦</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;height:100%;font-family:Arial,"Noto Sans JP",sans-serif;background:#111;color:#fff}
+button,input{font:inherit}
+#app{min-height:100vh;background:linear-gradient(#75c9f5 0 52%,#77c85b 52%);overflow:hidden}
+header{padding:12px 20px;text-align:center;background:#111c;position:relative;z-index:10}
+h1{margin:0;font-size:clamp(28px,4vw,48px)}
+#race{position:relative;height:55vh;min-height:360px;overflow:hidden;border-bottom:5px solid #222}
+#world{position:absolute;left:0;top:0;height:100%;width:100000px;transition:left .65s cubic-bezier(.2,.8,.2,1)}
+.ground{position:absolute;left:0;right:0;top:52%;bottom:0;background:
+ repeating-linear-gradient(0deg,#77c85b 0 35px,#66b94d 35px 38px),
+ repeating-linear-gradient(90deg,transparent 0 140px,#ffffff22 140px 145px)}
+.distance-line{position:absolute;top:52%;height:48%;border-left:4px solid #fff8}
+.distance-label{position:absolute;top:53%;transform:translateX(-50%);font-weight:900;background:#222b;padding:4px 8px;border-radius:8px}
+.player{
+ position:absolute;left:20px;width:190px;height:110px;display:flex;align-items:center;
+ transition:transform .65s cubic-bezier(.2,.8,.2,1);z-index:3
+}
+.player img{width:150px;height:105px;object-fit:contain;filter:drop-shadow(0 6px 3px #0007)}
+.pname{position:absolute;left:0;top:-5px;background:#111d;padding:4px 8px;border-radius:8px;font-weight:900}
+#p1{top:2%}#p2{top:27%}#p3{top:52%}#p4{top:77%}
+#controls{background:#f5f5f5;color:#111;padding:14px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.control{border:3px solid #222;border-radius:16px;padding:10px;background:#fff}
+.control h2{margin:0 0 7px;font-size:20px}
+.control input[type=number]{width:100%;padding:8px;border:2px solid #333;border-radius:9px;font-size:22px;text-align:center}
+.control button,.mainbtn{width:100%;margin-top:7px;padding:9px;border:0;border-radius:10px;background:#222;color:#fff;font-weight:900;cursor:pointer}
+.upload{font-size:13px;margin-top:7px;width:100%}
+.stat{font-weight:900;margin-top:5px}
+#bottom{background:#111;color:#fff;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+.mainbtn{width:auto;margin:0;padding:10px 18px;background:#fff;color:#111}
+#message{font-size:18px;font-weight:900}
+.fullscreen #controls{display:none}
+.fullscreen header{display:none}
+.fullscreen #race{height:100vh;border:0}
+@media(max-width:800px){
+ #controls{grid-template-columns:1fr 1fr}
+ .player{width:150px}.player img{width:120px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+<header><h1>🏃 あしぶみレーサー</h1></header>
+
+<section id="race">
+  <div id="world">
+    <div class="ground"></div>
+    <div id="markers"></div>
+
+    <div class="player" id="p1"><span class="pname">プレイヤー1</span><img id="img1"></div>
+    <div class="player" id="p2"><span class="pname">プレイヤー2</span><img id="img2"></div>
+    <div class="player" id="p3"><span class="pname">プレイヤー3</span><img id="img3"></div>
+    <div class="player" id="p4"><span class="pname">プレイヤー4</span><img id="img4"></div>
+  </div>
+</section>
+
+<section id="controls">
+  <div class="control">
+    <h2>🟢 プレイヤー1</h2>
+    <input id="steps1" type="number" min="0" placeholder="歩数">
+    <button onclick="addSteps(1)">▶ 進む</button>
+    <input class="upload" type="file" accept="image/*" onchange="loadImage(1,this)">
+    <div class="stat" id="total1">0歩 / 0.0m</div>
+  </div>
+  <div class="control">
+    <h2>🔴 プレイヤー2</h2>
+    <input id="steps2" type="number" min="0" placeholder="歩数">
+    <button onclick="addSteps(2)">▶ 進む</button>
+    <input class="upload" type="file" accept="image/*" onchange="loadImage(2,this)">
+    <div class="stat" id="total2">0歩 / 0.0m</div>
+  </div>
+  <div class="control">
+    <h2>🟡 プレイヤー3</h2>
+    <input id="steps3" type="number" min="0" placeholder="歩数">
+    <button onclick="addSteps(3)">▶ 進む</button>
+    <input class="upload" type="file" accept="image/*" onchange="loadImage(3,this)">
+    <div class="stat" id="total3">0歩 / 0.0m</div>
+  </div>
+  <div class="control">
+    <h2>🩷 プレイヤー4</h2>
+    <input id="steps4" type="number" min="0" placeholder="歩数">
+    <button onclick="addSteps(4)">▶ 進む</button>
+    <input class="upload" type="file" accept="image/*" onchange="loadImage(4,this)">
+    <div class="stat" id="total4">0歩 / 0.0m</div>
+  </div>
+</section>
+
+<div id="bottom">
+  <span id="message">画像を選択して、歩数を入力！</span>
+  <button class="mainbtn" onclick="resetGame()">🔄 リセット</button>
+  <button class="mainbtn" onclick="toggleFullscreen()">⛶ 全画面</button>
+</div>
+</div>
+
+<script>
+const state=[0,0,0,0];
+const colors=["🟢","🔴","🟡","🩷"];
+const STEP_M=0.7;       // 1歩 = 0.7m
+const PX_PER_M=5;       // 1mあたりの画面上の移動量
+const BASE_X=20;
+
+function addSteps(n){
+  const input=document.getElementById("steps"+n);
+  const steps=Math.floor(Number(input.value));
+  if(!Number.isFinite(steps)||steps<=0){input.focus();return}
+  state[n-1]+=steps;
+  const meters=state[n-1]*STEP_M;
+  document.getElementById("total"+n).textContent=`${state[n-1]}歩 / ${meters.toFixed(1)}m`;
+
+  const x=BASE_X+meters*PX_PER_M;
+  document.getElementById("p"+n).style.transform=`translateX(${x}px)`;
+
+  // 4人の中で最も先頭の位置にカメラを合わせる
+  updateCamera();
+  input.value="";
+  document.getElementById("message").textContent=
+    `${colors[n-1]} プレイヤー${n}：${meters.toFixed(1)}m地点まで進みました！`;
+}
+
+function updateCamera(){
+  const maxM=Math.max(...state)*STEP_M;
+  const race=document.getElementById("race");
+  const viewCenter=race.clientWidth*0.42;
+  const camera=Math.max(0,maxM*PX_PER_M-viewCenter);
+  document.getElementById("world").style.left=(-camera)+"px";
+  drawMarkers(camera);
+}
+
+function drawMarkers(camera){
+  const markers=document.getElementById("markers");
+  const start=Math.max(0,Math.floor(camera/PX_PER_M/50)*50);
+  let s="";
+  for(let m=start;m<start+Math.ceil(window.innerWidth/PX_PER_M)+150;m+=50){
+    const x=m*PX_PER_M;
+    s+=`<div class="distance-line" style="left:${x}px"></div>`;
+    s+=`<div class="distance-label" style="left:${x}px">${m}m</div>`;
+  }
+  markers.innerHTML=s;
+}
+
+function loadImage(n,input){
+  const file=input.files[0];
+  if(!file)return;
+  const url=URL.createObjectURL(file);
+  const img=document.getElementById("img"+n);
+  img.src=url;
+  img.onload=()=>URL.revokeObjectURL(url);
+}
+
+function resetGame(){
+  for(let i=0;i<4;i++){
+    state[i]=0;
+    document.getElementById("total"+(i+1)).textContent="0歩 / 0.0m";
+    document.getElementById("steps"+(i+1)).value="";
+    document.getElementById("p"+(i+1)).style.transform="translateX(0)";
+  }
+  document.getElementById("world").style.left="0px";
+  document.getElementById("message").textContent="画像を選択して、歩数を入力！";
+  drawMarkers(0);
+}
+
+function toggleFullscreen(){
+  if(!document.fullscreenElement){
+    document.documentElement.requestFullscreen?.();
+    document.body.classList.add("fullscreen");
+  }else{
+    document.exitFullscreen?.();
+    document.body.classList.remove("fullscreen");
+  }
+}
+document.addEventListener("fullscreenchange",()=>{
+  document.body.classList.toggle("fullscreen",!!document.fullscreenElement);
+  updateCamera();
+});
+drawMarkers(0);
+</script>
+</body>
+</html>
