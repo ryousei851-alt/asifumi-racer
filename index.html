@@ -32,6 +32,9 @@ h1{margin:0;font-size:clamp(28px,4vw,48px)}
 .control button,.mainbtn{width:100%;margin-top:7px;padding:9px;border:0;border-radius:10px;background:#222;color:#fff;font-weight:900;cursor:pointer}
 .upload{font-size:13px;margin-top:7px;width:100%}
 .stat{font-weight:900;margin-top:5px}
+#motionPanel{background:#eaf7ff;color:#111;padding:12px 14px;border-top:3px solid #222;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+#motionPanel select,#motionPanel button{padding:9px 12px;border:2px solid #222;border-radius:10px;font-weight:900}
+#motionStatus{font-weight:900}#motionDebug{font-size:13px;font-weight:700;opacity:.8}
 #bottom{background:#111;color:#fff;padding:10px 14px;display:flex;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
 .mainbtn{width:auto;margin:0;padding:10px 18px;background:#fff;color:#111}
 #message{font-size:18px;font-weight:900}
@@ -91,6 +94,23 @@ h1{margin:0;font-size:clamp(28px,4vw,48px)}
   </div>
 </section>
 
+<section id="motionPanel">
+  <strong>📱 自動歩数</strong>
+  <label>歩く人：
+    <select id="motionPlayer">
+      <option value="1">プレイヤー1</option>
+      <option value="2">プレイヤー2</option>
+      <option value="3">プレイヤー3</option>
+      <option value="4">プレイヤー4</option>
+    </select>
+  </label>
+  <button id="motionBtn" onclick="startMotion()">▶ 自動カウント開始</button>
+  <button onclick="stopMotion()">■ 停止</button>
+  <button onclick="diagnoseMotion()">🔎 センサー診断</button>
+  <span id="motionStatus">停止中</span>
+  <span id="motionDebug">イベント: 0 / 加速度: --</span>
+</section>
+
 <div id="bottom">
   <span id="message">画像を選択して、歩数を入力！</span>
   <button class="mainbtn" onclick="resetGame()">🔄 リセット</button>
@@ -110,15 +130,9 @@ function addSteps(n){
   const steps=Math.floor(Number(input.value));
   if(!Number.isFinite(steps)||steps<=0){input.focus();return}
   state[n-1]+=steps;
-  const meters=state[n-1]*STEP_M;
-  document.getElementById("total"+n).textContent=`${state[n-1]}歩 / ${meters.toFixed(1)}m`;
-
-  const x=BASE_X+meters*PX_PER_M;
-  document.getElementById("p"+n).style.transform=`translateX(${x}px)`;
-
-  // 4人の中で最も先頭の位置にカメラを合わせる
-  updateCamera();
+  updatePlayer(n);
   input.value="";
+  const meters=state[n-1]*STEP_M;
   document.getElementById("message").textContent=
     `${colors[n-1]} プレイヤー${n}：${meters.toFixed(1)}m地点まで進みました！`;
 }
@@ -134,7 +148,7 @@ function updateCamera(){
 
 function drawMarkers(camera){
   const markers=document.getElementById("markers");
-  const start=Math.max(0,Math.floor(camera/PX_PER_M/50)*50);
+  const start=Math.max(0,Math.floor(camera/PX_PER_M/50)*50-50);
   let s="";
   for(let m=start;m<start+Math.ceil(window.innerWidth/PX_PER_M)+150;m+=50){
     const x=m*PX_PER_M;
@@ -153,7 +167,206 @@ function loadImage(n,input){
   img.onload=()=>URL.revokeObjectURL(url);
 }
 
+
+let motionRunning=false;
+let motionPermissionGranted=false;
+let motionListener=null;
+let motionEvents=0;
+let motionTestTimer=null;
+let motionLast=0;
+let signalMean=0;
+let signalPrev=0;
+let signalHigh=false;
+let motionCooldownUntil=0;
+
+function setMotionStatus(text){
+  document.getElementById("motionStatus").textContent=text;
+}
+
+function setMotionDebug(){
+  const el=document.getElementById("motionDebug");
+  const acc=el.dataset.acc || "--";
+  el.textContent=`イベント: ${motionEvents} / 加速度: ${acc}`;
+}
+
+function setDebugAcceleration(value){
+  const el=document.getElementById("motionDebug");
+  el.dataset.acc=value;
+  setMotionDebug();
+}
+
+async function getMotionPermission(){
+  if(typeof DeviceMotionEvent==="undefined"){
+    return {ok:false,reason:"unsupported"};
+  }
+
+  if(typeof DeviceMotionEvent.requestPermission==="function"){
+    try{
+      const result=await DeviceMotionEvent.requestPermission();
+      if(result!=="granted") return {ok:false,reason:result};
+      return {ok:true,reason:"granted"};
+    }catch(e){
+      return {ok:false,reason:"error",error:e};
+    }
+  }
+
+  // Browsers without requestPermission can attach the listener directly.
+  return {ok:true,reason:"not-required"};
+}
+
+function resetMotionDetector(){
+  motionEvents=0;
+  motionLast=0;
+  signalMean=0;
+  signalPrev=0;
+  signalHigh=false;
+  motionCooldownUntil=0;
+  setDebugAcceleration("--");
+  setMotionDebug();
+}
+
+async function startMotion(){
+  if(motionRunning){
+    setMotionStatus("すでに自動カウント中です 🚶");
+    return;
+  }
+
+  resetMotionDetector();
+  setMotionStatus("センサーの許可を確認中…");
+
+  const permission=await getMotionPermission();
+  if(!permission.ok){
+    if(permission.reason==="unsupported"){
+      setMotionStatus("このSafariでは動きセンサーが使えません");
+    }else if(permission.reason==="denied"){
+      setMotionStatus("センサーが拒否されています。Safariの設定を確認してください");
+    }else{
+      setMotionStatus("センサーの許可が必要です（もう一度試してください）");
+    }
+    return;
+  }
+
+  motionPermissionGranted=true;
+  motionRunning=true;
+  motionListener=handleMotion;
+  window.addEventListener("devicemotion",motionListener,{passive:true});
+  document.getElementById("motionBtn").textContent="● 自動カウント中";
+  setMotionStatus("センサー許可OK。歩いてみてください 🚶");
+
+  // If Safari gives us no events, explain that instead of silently looking stopped.
+  clearTimeout(motionTestTimer);
+  motionTestTimer=setTimeout(()=>{
+    if(motionRunning && motionEvents===0){
+      setMotionStatus("センサーデータが届いていません。Safariで開いているか確認してください");
+    }else if(motionRunning){
+      setMotionStatus("歩数を検出中 🚶");
+    }
+  },1800);
+}
+
+function stopMotion(){
+  if(motionListener){
+    window.removeEventListener("devicemotion",motionListener);
+    motionListener=null;
+  }
+  clearTimeout(motionTestTimer);
+  motionRunning=false;
+  document.getElementById("motionBtn").textContent="▶ 自動カウント開始";
+  setMotionStatus("停止中");
+  setMotionDebug();
+}
+
+function diagnoseMotion(){
+  if(typeof DeviceMotionEvent==="undefined"){
+    setMotionStatus("❌ DeviceMotionEventが利用できません");
+    return;
+  }
+  setMotionStatus("🔎 センサー診断中… iPhoneを軽く動かしてください");
+  const before=motionEvents;
+  const listener=(e)=>{
+    motionEvents++;
+    const a=e.acceleration || e.accelerationIncludingGravity;
+    if(a && a.x!=null && a.y!=null && a.z!=null){
+      const mag=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
+      setDebugAcceleration(mag.toFixed(2)+" m/s²");
+    }
+  };
+  window.addEventListener("devicemotion",listener,{passive:true});
+  setTimeout(()=>{
+    window.removeEventListener("devicemotion",listener);
+    if(motionEvents>before){
+      setMotionStatus(`✅ センサーOK（約${motionEvents-before}件受信）`);
+    }else{
+      setMotionStatus("❌ センサーデータを受信できませんでした");
+    }
+  },2000);
+}
+
+function handleMotion(e){
+  if(!motionRunning)return;
+  motionEvents++;
+
+  // Prefer gravity-free acceleration when Safari provides it.
+  let a=e.acceleration;
+  let usesGravityIncluded=false;
+  if(!a || a.x==null || a.y==null || a.z==null){
+    a=e.accelerationIncludingGravity;
+    usesGravityIncluded=true;
+  }
+  if(!a || a.x==null || a.y==null || a.z==null)return;
+
+  const raw=Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z);
+  setDebugAcceleration(raw.toFixed(2)+" m/s²");
+
+  let signal=raw;
+  if(usesGravityIncluded){
+    // Estimate the slow gravity component when only total acceleration is available.
+    signalMean=signalMean===0 ? raw : signalMean*0.92+raw*0.08;
+    signal=Math.abs(raw-signalMean);
+  }else{
+    signalMean=signalMean===0 ? raw : signalMean*0.94+raw*0.06;
+    signal=Math.abs(raw-signalMean);
+  }
+
+  const now=performance.now();
+  if(motionLast===0){
+    motionLast=now;
+    signalPrev=signal;
+    return;
+  }
+
+  // A simple peak detector. This is an estimate, not Health app step counting.
+  const rise=signal>1.0 && signal>signalPrev;
+  if(now>=motionCooldownUntil && rise){
+    signalHigh=true;
+  }
+
+  if(signalHigh && signal<0.55 && signalPrev>=signal && now>=motionCooldownUntil){
+    const player=Number(document.getElementById("motionPlayer").value);
+    state[player-1]+=1;
+    updatePlayer(player);
+    signalHigh=false;
+    motionCooldownUntil=now+300;
+    setMotionStatus(`🚶 プレイヤー${player}: ${state[player-1]}歩`);
+  }
+
+  signalPrev=signal;
+  motionLast=now;
+}
+
+function updatePlayer(n){
+  const meters=state[n-1]*STEP_M;
+  document.getElementById("total"+n).textContent=
+    `${state[n-1]}歩 / ${meters.toFixed(1)}m`;
+  const x=meters*PX_PER_M;
+  document.getElementById("p"+n).style.transform=`translateX(${x}px)`;
+  updateCamera();
+  document.getElementById("message").textContent=
+    `${colors[n-1]} プレイヤー${n}：${meters.toFixed(1)}m地点まで進みました！`;
+}
+
 function resetGame(){
+  stopMotion();
   for(let i=0;i<4;i++){
     state[i]=0;
     document.getElementById("total"+(i+1)).textContent="0歩 / 0.0m";
@@ -162,7 +375,7 @@ function resetGame(){
   }
   document.getElementById("world").style.left="0px";
   document.getElementById("message").textContent="画像を選択して、歩数を入力！";
-  drawMarkers(0);
+  updateCamera();
 }
 
 function toggleFullscreen(){
