@@ -1,0 +1,614 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<title>あしぶみレーサー 4人対戦</title>
+<style>
+*{box-sizing:border-box}
+html,body{margin:0;width:100%;min-height:100%;font-family:Arial,"Noto Sans JP",sans-serif;background:#dff3ff;color:#102235}
+body{overflow-x:hidden}
+button,input,select{font:inherit;touch-action:manipulation}
+button{cursor:pointer;-webkit-tap-highlight-color:transparent;position:relative;z-index:50}
+#app{min-height:100vh;background:#eaf8ff}
+header{height:76px;padding:10px 22px;background:#101c2b;color:#fff;display:flex;align-items:center;justify-content:space-between;gap:14px;position:relative;z-index:10;border-bottom:4px solid #263b52}
+h1{margin:0;font-size:clamp(25px,4vw,43px);font-weight:1000;letter-spacing:-1px;text-shadow:3px 3px 0 #07111b}
+h1:first-letter{font-size:1.05em}
+#goalBadge{background:#101c2b;border:3px solid #fff;border-radius:28px;padding:8px 18px;font-size:clamp(18px,2.5vw,28px);font-weight:1000;white-space:nowrap;box-shadow:0 3px 0 #000}
+#goalBadge b{color:#ffe100;font-size:1.15em}
+
+#roomPanel{background:#fff;color:#111;padding:8px 12px;display:flex;gap:7px;align-items:center;justify-content:center;flex-wrap:wrap;border-bottom:2px solid #9bb4c8}
+#roomPanel input{width:150px;padding:7px;border:2px solid #53687a;border-radius:9px;text-align:center;font-weight:900;text-transform:uppercase}
+.roombtn{padding:7px 11px;border:0;border-radius:9px;background:#14283b;color:#fff;font-weight:900}
+#roomInfo{font-weight:900;font-size:14px}
+
+#race{position:relative;height:51vh;min-height:360px;overflow:hidden;border-bottom:5px solid #172638;background:
+ radial-gradient(circle at 8% 20%,#fff 0 25px,transparent 26px),
+ radial-gradient(circle at 11% 17%,#fff 0 16px,transparent 17px),
+ radial-gradient(circle at 47% 16%,#fff 0 27px,transparent 28px),
+ radial-gradient(circle at 51% 19%,#fff 0 18px,transparent 19px),
+ radial-gradient(circle at 80% 14%,#fff 0 22px,transparent 23px),
+ linear-gradient(#31b7f0 0 54%,#86d84e 54% 100%)}
+#race:before{content:"";position:absolute;inset:0;pointer-events:none;background:
+ radial-gradient(ellipse at 10% 52%,#55b94e 0 80px,transparent 81px),
+ radial-gradient(ellipse at 29% 52%,#4cae49 0 105px,transparent 106px),
+ radial-gradient(ellipse at 63% 53%,#54b74d 0 90px,transparent 91px),
+ radial-gradient(ellipse at 88% 52%,#4fae48 0 110px,transparent 111px)}
+#race:after{content:"";position:absolute;left:0;right:0;top:54%;height:9px;background:#5dbd3f;box-shadow:0 7px 0 #2d8c37;z-index:1}
+
+#world{position:absolute;left:0;top:0;height:100%;width:900px;transition:left .45s cubic-bezier(.2,.8,.2,1)}
+.ground{position:absolute;left:0;right:0;top:59%;bottom:0;background:
+ repeating-linear-gradient(0deg,#8d5a2b 0 28px,#a86e34 28px 32px),
+ repeating-linear-gradient(90deg,transparent 0 85px,#5e371c22 85px 90px);z-index:0}
+.distance-line{position:absolute;top:59%;height:41%;border-left:3px solid #fff;z-index:2}
+.distance-label{position:absolute;top:60%;transform:translateX(-50%);font-weight:1000;background:#172638;color:#fff;padding:3px 7px;border-radius:6px;z-index:5}
+.player{position:absolute;left:18px;width:180px;height:72px;display:flex;align-items:center;transition:transform .45s cubic-bezier(.2,.8,.2,1);z-index:8}
+.player img{width:72px;height:68px;object-fit:contain;filter:drop-shadow(0 5px 2px #0007)}
+.pname{position:absolute;left:0;top:-4px;background:#102235;color:#fff;padding:5px 9px;border-radius:15px;font-weight:1000;white-space:nowrap;border:2px solid #fff}
+#p1{top:18%}#p2{top:34%}#p3{top:50%}#p4{top:66%}
+
+.decor{position:absolute;z-index:4;pointer-events:none}
+.cloud{font-size:54px;filter:drop-shadow(0 4px 0 #ffffff55)}
+.c1{left:150px;top:7%}.c2{left:650px;top:12%}
+.block{width:55px;height:55px;border:4px solid #9b5a16;border-radius:6px;background:linear-gradient(#ffd04a,#e99718);color:#fff;font-size:37px;line-height:46px;text-align:center;font-weight:1000;text-shadow:2px 2px #a85b00;box-shadow:inset 0 0 0 3px #ffe88a,0 5px 0 #7e4818}
+.b1{left:255px;top:25%}.b2{left:430px;top:16%}
+.pipe{position:absolute;z-index:4;pointer-events:none;width:62px;height:92px;border:6px solid #24752d;border-radius:8px 8px 0 0;background:linear-gradient(90deg,#48b943,#8ae25b 45%,#27852d 46% 100%);box-shadow:0 6px 0 #185a24}
+.pipe:before{content:"";position:absolute;left:-12px;top:-15px;width:74px;height:23px;border:6px solid #24752d;border-radius:8px;background:#66d85a}
+.pipe1{left:365px;top:42%}.pipe2{left:555px;top:35%}
+.coin{position:absolute;z-index:5;pointer-events:none;width:38px;height:38px;border:4px solid #c58a00;border-radius:50%;background:#ffd83d;color:#fff;display:flex;align-items:center;justify-content:center;font-size:21px;font-weight:1000;text-shadow:1px 1px #b47700;box-shadow:inset 0 0 0 3px #fff06a,0 4px 0 #a76f00;animation:coinBob 1s ease-in-out infinite alternate}
+.coin1{left:215px;top:34%}.coin2{left:475px;top:28%}
+@keyframes coinBob{to{transform:translateY(-8px)}}
+.brick{position:absolute;z-index:4;pointer-events:none;width:135px;height:38px;background:
+ linear-gradient(90deg,transparent 0 42px,#7c351b 43px 47px,transparent 48px 88px,#7c351b 89px 93px,transparent 94px),
+ linear-gradient(#b75d2b,#8e3f1e);border:4px solid #672b16;border-radius:4px;box-shadow:0 4px 0 #552312}
+.brick:after{content:"";position:absolute;inset:14px 0 auto;height:4px;background:#672b16}
+.brick1{left:300px;top:10%}.brick2{left:510px;top:20%}
+.enemy{position:absolute;z-index:5;pointer-events:none;width:44px;height:44px;border-radius:50%;background:#9b4b32;border:4px solid #5e2a1e;color:#fff;text-align:center;line-height:35px;font-size:20px;box-shadow:0 5px 0 #542419}
+.enemy:after{content:"";position:absolute;left:6px;right:6px;bottom:-7px;height:10px;border-radius:50%;background:#6d321f}
+.enemy1{left:420px;top:45%;animation:enemyWalk 1.4s ease-in-out infinite alternate}
+.enemy2{left:650px;top:32%;animation:enemyWalk 1.1s ease-in-out infinite alternate-reverse}
+@keyframes enemyWalk{to{transform:translateX(18px)}}
+
+#goal{position:absolute;left:500px;top:12%;width:14px;height:60%;background:#f5f5f5;border:3px solid #4d5965;border-radius:8px;z-index:9;box-shadow:4px 0 0 #aaa}
+#goal:before{content:"";position:absolute;left:8px;top:10px;width:72px;height:45px;background:#ef3e43;clip-path:polygon(0 0,100% 0,70% 50%,100% 100%,0 100%);box-shadow:0 0 0 2px #fff}
+#goal:after{content:"100m";position:absolute;left:-23px;bottom:-43px;width:70px;padding:5px 4px;text-align:center;background:#172638;color:#fff;border-radius:7px;font-size:18px;font-weight:1000;box-shadow:0 3px 0 #0b1118}
+
+#ranking{background:#f8fbfd;color:#111;padding:10px 14px;border-bottom:2px solid #b7c8d5}
+#ranking h3{display:none}
+#rankList{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap;font-weight:1000}
+.rank{padding:7px 11px;border-radius:10px;background:#edf2f6;border:1px solid #c6d3dd}
+
+#controls{background:#eaf7ff;color:#111;padding:10px 18px;display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.control{border:4px solid #27394b;border-radius:15px;padding:9px;background:#fff;box-shadow:0 3px 0 #b6c5cf}
+#c1{border-color:#ef3037}#c2{border-color:#2088df}#c3{border-color:#16a84a}#c4{border-color:#e8c21b}
+.control h2{margin:0 0 6px;font-size:17px}
+.control input[type=number]{width:100%;padding:7px;border:2px solid #bdcbd5;border-radius:9px;font-size:20px;text-align:center}
+.control button{width:100%;margin-top:6px;padding:8px;border:0;border-radius:9px;background:#13283b;color:#fff;font-weight:1000}
+.upload{font-size:12px;margin-top:6px;width:100%}
+.stat{font-weight:1000;margin-top:5px;text-align:center}
+.me{outline:4px solid #1683ff}
+
+#motionPanel{background:#dff4ff;color:#111;padding:9px 18px;border-top:2px solid #9fc8df;display:flex;gap:9px;align-items:center;justify-content:center;flex-wrap:wrap}
+#motionPanel select,#motionPanel button{padding:8px 10px;border:2px solid #9db8c9;border-radius:9px;font-weight:900}
+#motionStatus{font-weight:1000}
+#motionDebug{font-size:12px;font-weight:700;opacity:.8}
+#bottom{background:#eef6fa;color:#111;padding:10px 18px;display:flex;gap:9px;align-items:center;justify-content:flex-end;flex-wrap:wrap;border-top:2px solid #b7c8d5}
+.mainbtn{padding:10px 18px;border:3px solid #172638;border-radius:11px;background:#fff;color:#111;font-weight:1000}
+#message{font-size:15px;font-weight:1000;margin-right:auto}
+
+.hidden{display:none!important}
+.fullscreen #controls,.fullscreen #motionPanel,.fullscreen #roomPanel,.fullscreen header,.fullscreen #ranking,.fullscreen #bottom{display:none}
+.fullscreen #race{height:100vh;border:0}
+
+@media(max-width:900px){
+ #controls{grid-template-columns:1fr 1fr}
+ header{padding:9px 13px}
+ #world{width:900px}
+}
+@media(max-width:520px){
+ header{height:66px}
+ h1{font-size:24px}
+ #goalBadge{font-size:15px;padding:7px 10px}
+ #roomPanel{font-size:12px}
+ #race{height:45vh;min-height:300px}
+ #controls{grid-template-columns:1fr 1fr;padding:7px}
+ .control{padding:6px;border-width:3px}
+ .control h2{font-size:14px}
+ .pname{font-size:12px}
+ .player img{width:62px}
+ #bottom{justify-content:center}
+ #message{width:100%;text-align:center}
+}
+
+/* 横画面専用UI */
+#landscapeNotice{display:none;position:fixed;inset:0;z-index:9999;background:#102235;color:#fff;align-items:center;justify-content:center;text-align:center;padding:30px;font-weight:1000;font-size:28px}
+@media (orientation:portrait){#landscapeNotice{display:flex}body>*:not(#landscapeNotice){visibility:hidden}}
+@media (orientation:landscape){#landscapeNotice{display:none}}
+@media (min-width:700px) and (orientation:landscape){
+  #race{height:52vh;min-height:330px}
+  #controls{grid-template-columns:repeat(4,1fr);padding:8px 14px}
+  .control{padding:7px}
+  #motionPanel{padding:7px 14px}
+}
+</style>
+</head>
+<body><div id="landscapeNotice">📱↔️<br><br>スマホを横向きにして遊んでね！</div>
+<div id="app">
+<header><h1>👟 あしぶみレーサー <span style="font-size:.72em">4人対戦</span></h1><div id="goalBadge">👑 ゴール：<b>100m</b></div></header>
+
+<section id="roomPanel">
+  <strong>🌐 4人対戦</strong>
+  <input id="nameInput" maxlength="12" placeholder="名前">
+  <button type="button" class="roombtn" onclick="createRoom();return false;">🏠 部屋を作る</button>
+  <input id="roomInput" maxlength="6" minlength="6" placeholder="6文字の部屋ID">
+  <button type="button" class="roombtn" onclick="joinRoom();return false;">🚪 参加</button>
+  <span id="roomInfo">未接続</span>
+</section>
+
+<section id="race">
+  <div id="world">
+    <div class="ground"></div>
+    <div id="markers"></div>
+    <div class="decor cloud c1">☁️</div>
+    <div class="decor cloud c2">☁️</div>
+    <div class="decor block b1">?</div>
+    <div class="decor block b2">?</div>
+    <div id="goal" aria-label="ゴール"></div>
+    <div class="pipe pipe1"><i></i></div>
+    <div class="pipe pipe2"><i></i></div>
+    <div class="coin coin1">★</div>
+    <div class="coin coin2">★</div>
+    <div class="brick brick1"></div>
+    <div class="brick brick2"></div>
+    <div class="enemy enemy1">●</div>
+    <div class="enemy enemy2">●</div>
+    <div class="player" id="p1"><span class="pname" id="name1">プレイヤー1</span><img id="img1"></div>
+    <div class="player" id="p2"><span class="pname" id="name2">プレイヤー2</span><img id="img2"></div>
+    <div class="player" id="p3"><span class="pname" id="name3">プレイヤー3</span><img id="img3"></div>
+    <div class="player" id="p4"><span class="pname" id="name4">プレイヤー4</span><img id="img4"></div>
+  </div>
+</section>
+
+<section id="ranking">
+  <h3>🏁 現在の順位</h3>
+  <div id="rankList">まだレース開始前</div>
+</section>
+
+<section id="controls">
+  <div class="control" id="c1"><h2>🟢 <span id="ct1">プレイヤー1</span></h2>
+    <input id="steps1" type="number" min="0" placeholder="歩数">
+    <button type="button" onclick="addManual(1);return false;">▶ 進む</button>
+    <input class="upload" type="file" accept="image/*" onchange="loadImage(1,this)">
+    <div class="stat" id="total1">0歩 / 0.0m</div>
+  </div>
+  <div class="control" id="c2"><h2>🔴 <span id="ct2">プレイヤー2</span></h2>
+    <input id="steps2" type="number" min="0" placeholder="歩数">
+    <button type="button" onclick="addManual(2);return false;">▶ 進む</button>
+    <input class="upload" type="file" accept="image/*" onchange="loadImage(2,this)">
+    <div class="stat" id="total2">0歩 / 0.0m</div>
+  </div>
+  <div class="control" id="c3"><h2>🟡 <span id="ct3">プレイヤー3</span></h2>
+    <input id="steps3" type="number" min="0" placeholder="歩数">
+    <button type="button" onclick="addManual(3);return false;">▶ 進む</button>
+    <input class="upload" type="file" accept="image/*" onchange="loadImage(3,this)">
+    <div class="stat" id="total3">0歩 / 0.0m</div>
+  </div>
+  <div class="control" id="c4"><h2>🩷 <span id="ct4">プレイヤー4</span></h2>
+    <input id="steps4" type="number" min="0" placeholder="歩数">
+    <button type="button" onclick="addManual(4);return false;">▶ 進む</button>
+    <input class="upload" type="file" accept="image/*" onchange="loadImage(4,this)">
+    <div class="stat" id="total4">0歩 / 0.0m</div>
+  </div>
+</section>
+
+<section id="motionPanel">
+  <strong>📱 自動歩数</strong>
+  <span>あなた：<b id="myRole">未参加</b></span>
+  <button type="button" id="motionBtn" onclick="startMotion();return false;">▶ 自動カウント開始</button>
+  <button type="button" onclick="stopMotion();return false;">■ 停止</button>
+  <button type="button" onclick="diagnoseMotion();return false;">🔎 センサー診断</button>
+  <span id="motionStatus">停止中</span>
+  <span id="motionDebug">イベント: 0 / 加速度: --</span>
+</section>
+
+<div id="bottom">
+  <span id="message">部屋を作るか、ルームコードで参加してください。</span>
+  <button type="button" class="mainbtn" onclick="resetGame();return false;">🔄 リセット</button>
+  <button type="button" class="mainbtn" onclick="toggleFullscreen();return false;">⛶ 全画面</button>
+</div>
+</div>
+
+<script src="https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js"></script>
+<script>
+try{if(screen.orientation&&screen.orientation.lock){screen.orientation.lock("landscape").catch(()=>{});}}catch(e){}
+
+const STEP_M=0.7, PX_PER_M=5, GOAL_M=100;
+const colors=["🟢","🔴","🟡","🩷"];
+const state=[0,0,0,0];
+const names=["プレイヤー1","プレイヤー2","プレイヤー3","プレイヤー4"];
+let peer=null,isHost=false,myPlayer=0,roomCode="";
+const connections=new Map(); // host: peerId -> {conn, player}
+let hostConn=null;
+
+function code6(){return Math.random().toString(36).slice(2,8).toUpperCase()}
+function setMessage(t){document.getElementById("message").textContent=t}
+function setRoomInfo(t){document.getElementById("roomInfo").textContent=t}
+function playerName(){
+  return (document.getElementById("nameInput").value.trim()||("プレイヤー"+(myPlayer||""))).slice(0,12);
+}
+function updateNames(){
+  for(let i=1;i<=4;i++){
+    document.getElementById("name"+i).textContent=colors[i-1]+" "+names[i-1];
+    document.getElementById("ct"+i).textContent=names[i-1];
+    document.getElementById("c"+i).classList.toggle("me",myPlayer===i);
+  }
+  document.getElementById("myRole").textContent=myPlayer?names[myPlayer-1]:"未参加";
+}
+function updateCamera(){
+  const maxM=Math.max(...state)*STEP_M;
+  const race=document.getElementById("race");
+  const camera=Math.max(0,maxM*PX_PER_M-race.clientWidth*0.42);
+  document.getElementById("world").style.left=(-camera)+"px";
+  drawMarkers(camera);
+}
+function drawMarkers(camera){
+  const markers=document.getElementById("markers");
+  const start=Math.max(0,Math.floor(camera/PX_PER_M/50)*50-50);
+  let s="";
+  for(let m=start;m<start+Math.ceil(window.innerWidth/PX_PER_M)+180;m+=50){
+    const x=m*PX_PER_M;
+    s+=`<div class="distance-line" style="left:${x}px"></div><div class="distance-label" style="left:${x}px">${m}m</div>`;
+  }
+  markers.innerHTML=s;
+}
+function render(){
+  for(let i=1;i<=4;i++){
+    const meters=state[i-1]*STEP_M;
+    document.getElementById("total"+i).textContent=`${state[i-1]}歩 / ${meters.toFixed(1)}m`;
+    document.getElementById("p"+i).style.transform=`translateX(${meters*PX_PER_M}px)`;
+  }
+  updateCamera();
+  updateRanking();
+  const winner=state.findIndex(v=>v*STEP_M>=GOAL_M);
+  if(winner>=0) setMessage(`🏁 ${colors[winner]} ${names[winner]} がゴール！`);
+}
+function updateRanking(){
+  const arr=state.map((v,i)=>({i,v})).sort((a,b)=>b.v-a.v);
+  const text=arr.map((x,k)=>`<span class="rank">${k+1}位 ${colors[x.i]} ${names[x.i]}：${x.v}歩</span>`).join("");
+  document.getElementById("rankList").innerHTML=text;
+}
+
+function broadcast(msg){
+  if(!isHost)return;
+  for(const {conn} of connections.values()){
+    if(conn && conn.open) try{conn.send(msg)}catch(e){}
+  }
+}
+function sendToHost(msg){
+  if(hostConn && hostConn.open) try{hostConn.send(msg)}catch(e){}
+}
+function hostState(){
+  return {type:"state",state:[...state],names:[...names]};
+}
+function applyDelta(n,delta){
+  delta=Math.floor(Number(delta)||0);
+  if(delta<=0)return;
+  state[n-1]+=delta;
+  render();
+  if(isHost){
+    broadcast(hostState());
+  }else{
+    sendToHost({type:"steps",delta,player:myPlayer});
+  }
+  setMessage(`${colors[n-1]} ${names[n-1]}：${state[n-1]}歩`);
+}
+function addManual(n){
+  // ルーム未接続でも動作確認できるようにする。
+  // ルーム接続後は自分のプレイヤーだけ操作可能。
+  if(myPlayer && n!==myPlayer){setMessage("自分のプレイヤーだけ操作できます。");return}
+  const el=document.getElementById("steps"+n);
+  const v=Math.floor(Number(el.value));
+  if(!Number.isFinite(v)||v<=0){el.focus();return}
+  applyDelta(n,v); el.value="";
+}
+
+function makeShortRoomCode(){
+  const chars="ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
+  let code="";
+  for(let i=0;i<6;i++) code+=chars[Math.floor(Math.random()*chars.length)];
+  return code;
+}
+
+function createRoom(attempt=0){
+  if(peer){setMessage("すでに接続しています。");return}
+  isHost=true; myPlayer=1;
+  roomCode=makeShortRoomCode();
+  setRoomInfo("部屋を作成中…");
+  setMessage("6文字の部屋IDを作っています…");
+
+  try{
+    // 6文字の短いIDをそのままPeerJSの部屋IDとして使用。
+    peer=new Peer(roomCode);
+  }catch(e){
+    peer=null;
+    setRoomInfo("作成失敗");
+    setMessage("通信機能を読み込めませんでした。Safariでページを再読み込みしてください。");
+    return;
+  }
+
+  const timeout=setTimeout(()=>{
+    if(peer && !peer.open){
+      setRoomInfo("接続待ち");
+      setMessage("通信サーバーに接続できません。インターネット接続を確認してください。");
+    }
+  },10000);
+
+  peer.on("open",id=>{
+    clearTimeout(timeout);
+    roomCode=id;
+    names[0]=(document.getElementById("nameInput").value.trim()||"プレイヤー1").slice(0,12);
+    document.getElementById("roomInput").value=roomCode;
+    setRoomInfo("部屋ID："+roomCode+"（P1）");
+    updateNames();
+    setMessage("この6文字の「部屋ID」を3人に送ってください。");
+  });
+
+  peer.on("connection",conn=>{
+    if(connections.size>=3){
+      conn.on("open",()=>conn.send({type:"full"}));
+      return;
+    }
+    conn.on("open",()=>{
+      const used=[1,...[...connections.values()].map(x=>x.player)];
+      let p=2; while(used.includes(p)&&p<=4)p++;
+      if(p>4){try{conn.send({type:"full"})}catch(e){};return}
+      connections.set(conn.peer,{conn,player:p});
+      conn.send({type:"assign",player:p,state:[...state],names:[...names]});
+      setRoomInfo(`部屋ID：${roomCode}　接続：${connections.size+1}/4`);
+      setMessage(`${names[p-1]} が参加しました。`);
+
+      conn.on("data",data=>{
+        if(data?.type==="steps"){
+          const rec=connections.get(conn.peer);
+          if(rec && data.player===rec.player) applyDeltaHost(rec.player,data.delta);
+        }
+        if(data?.type==="reset"){
+          state.fill(0); render(); broadcast(hostState());
+        }
+        if(data?.type==="name"){
+          const rec=connections.get(conn.peer);
+          if(rec){
+            names[rec.player-1]=String(data.name||("プレイヤー"+rec.player)).slice(0,12);
+            broadcast(hostState()); updateNames();
+          }
+        }
+      });
+      conn.on("close",()=>{
+        connections.delete(conn.peer);
+        setRoomInfo(`部屋ID：${roomCode}　接続：${connections.size+1}/4`);
+        setMessage("プレイヤーが退出しました。");
+      });
+      conn.on("error",()=>setMessage("参加者との通信でエラーが発生しました。"));
+    });
+  });
+
+  peer.on("disconnected",()=>{
+    setRoomInfo("通信切断");
+    setMessage("通信サーバーとの接続が切れました。");
+  });
+
+  peer.on("error",e=>{
+    clearTimeout(timeout);
+    const t=e?.type||"unknown";
+    // まれに6文字IDが他の部屋と重なった場合は自動で作り直す。
+    if(t==="unavailable-id" && attempt<5){
+      try{peer.destroy()}catch(_){ }
+      peer=null;
+      setMessage("部屋IDが重なったので、別のIDを作っています…");
+      setTimeout(()=>createRoom(attempt+1),200);
+      return;
+    }
+    setRoomInfo("作成失敗");
+    if(t==="browser-incompatible") setMessage("このSafariではWebRTCが使えません。Safariを最新版にしてください。");
+    else if(t==="network") setMessage("ネットワーク接続を確認してください。");
+    else setMessage("部屋を作れませんでした（"+t+"）。ページを再読み込みして再試行してください。");
+  });
+}
+
+function applyDeltaHost(n,delta){
+  delta=Math.floor(Number(delta)||0); if(delta<=0)return;
+  state[n-1]+=delta; render(); broadcast(hostState());
+  setMessage(`${colors[n-1]} ${names[n-1]}：${state[n-1]}歩`);
+}
+
+function joinRoom(){
+  if(peer){setMessage("すでに接続しています。");return}
+  roomCode=document.getElementById("roomInput").value.trim();
+  roomCode=roomCode.toUpperCase();
+  if(!/^[A-Z0-9]{6}$/.test(roomCode)){setMessage("6文字の部屋IDを入力してください。");return}
+  isHost=false;
+  setRoomInfo("参加準備中…");
+  setMessage("ホストへ接続しています…");
+
+  try{ peer=new Peer(); }
+  catch(e){ setRoomInfo("参加失敗"); setMessage("通信機能を読み込めませんでした。Safariで再読み込みしてください。"); return; }
+
+  peer.on("open",()=>{
+    hostConn=peer.connect(roomCode,{reliable:true});
+    const timer=setTimeout(()=>{
+      if(!hostConn || !hostConn.open){
+        setRoomInfo("接続待ち");
+        setMessage("ホストに接続できません。部屋IDが正しいか確認してください。");
+      }
+    },8000);
+
+    hostConn.on("open",()=>{
+      clearTimeout(timer);
+      setRoomInfo("部屋："+roomCode+"　接続中…");
+      hostConn.send({type:"name",name:(document.getElementById("nameInput").value.trim()||"プレイヤー").slice(0,12)});
+    });
+    hostConn.on("data",handleHostData);
+    hostConn.on("close",()=>{
+      setRoomInfo("接続切れ");
+      setMessage("ホストとの接続が切れました。");
+    });
+    hostConn.on("error",()=>setMessage("ホストとの通信でエラーが発生しました。"));
+  });
+  peer.on("error",e=>{
+    setRoomInfo("参加失敗");
+    setMessage("参加できませんでした（"+(e?.type||"unknown")+"）。部屋IDを確認してください。");
+  });
+}
+function handleHostData(data){
+  if(data?.type==="full"){setMessage("この部屋は満員です。");return}
+  if(data?.type==="assign"){
+    myPlayer=data.player;
+    state.splice(0,4,...data.state);
+    names.splice(0,4,...data.names);
+    setRoomInfo("部屋："+roomCode+"　あなたはP"+myPlayer+"");
+    updateNames(); render();
+    setMessage(`${names[myPlayer-1]}として参加しました。自動カウントを開始できます。`);
+  }
+  if(data?.type==="state"){
+    state.splice(0,4,...data.state);
+    names.splice(0,4,...data.names);
+    updateNames(); render();
+  }
+}
+
+
+function ensureAvatars(){
+  const avatars=["🏃","🏃‍♂️","🏃‍♀️","🏃"];
+  for(let i=1;i<=4;i++){
+    const img=document.getElementById("img"+i);
+    if(!img.getAttribute("src")){
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" width="80" height="80"><text x="40" y="58" text-anchor="middle" font-size="58">${avatars[i-1]}</text></svg>`;
+      img.src="data:image/svg+xml;charset=utf-8,"+encodeURIComponent(svg);
+    }
+  }
+}
+
+function loadImage(n,input){
+  const file=input.files[0]; if(!file)return;
+  if(file.size>1500000){setMessage("画像が大きすぎます。1.5MB以下にしてください。");return}
+  const url=URL.createObjectURL(file);
+  const img=document.getElementById("img"+n);
+  img.src=url;
+  img.onload=()=>URL.revokeObjectURL(url);
+  // 自分の画像だけ各端末で表示。通信を安定させるため画像データ自体は送信しません。
+}
+
+let motionRunning=false,motionListener=null,motionEvents=0,motionLast=0;
+let signalMean=0,signalPrev=0,signalHigh=false,motionCooldownUntil=0,motionTestTimer=null;
+
+function setMotionStatus(t){document.getElementById("motionStatus").textContent=t}
+function setDebugAcceleration(v){
+  document.getElementById("motionDebug").textContent=`イベント: ${motionEvents} / 加速度: ${v}`;
+}
+async function getMotionPermission(){
+  if(typeof DeviceMotionEvent==="undefined")return {ok:false,reason:"unsupported"};
+  if(typeof DeviceMotionEvent.requestPermission==="function"){
+    try{
+      const r=await DeviceMotionEvent.requestPermission();
+      if(r!=="granted")return {ok:false,reason:r};
+    }catch(e){return {ok:false,reason:"error"}}
+  }
+  return {ok:true};
+}
+function resetDetector(){
+  motionEvents=0;motionLast=0;signalMean=0;signalPrev=0;signalHigh=false;motionCooldownUntil=0;
+  setDebugAcceleration("--");
+}
+async function startMotion(){
+  if(motionRunning){setMotionStatus("すでに自動カウント中です 🚶");return}
+  resetDetector();setMotionStatus("センサーの許可を確認中…");
+  const p=await getMotionPermission();
+  if(!p.ok){
+    setMotionStatus(p.reason==="unsupported"?"この端末ではセンサーが使えません":p.reason==="denied"?"センサーが拒否されています":"センサーの許可が必要です");
+    return;
+  }
+  motionRunning=true;
+  motionListener=handleMotion;
+  window.addEventListener("devicemotion",motionListener,{passive:true});
+  document.getElementById("motionBtn").textContent="● 自動カウント中";
+  setMotionStatus("センサーOK。歩いてみてください 🚶");
+  clearTimeout(motionTestTimer);
+  motionTestTimer=setTimeout(()=>{
+    if(motionRunning && motionEvents===0)setMotionStatus("データが届いていません。Safariで開いているか確認してください");
+    else if(motionRunning)setMotionStatus("歩数を検出中 🚶");
+  },1800);
+}
+function stopMotion(){
+  if(motionListener)window.removeEventListener("devicemotion",motionListener);
+  motionListener=null;motionRunning=false;clearTimeout(motionTestTimer);
+  document.getElementById("motionBtn").textContent="▶ 自動カウント開始";
+  setMotionStatus("停止中");
+}
+function diagnoseMotion(){
+  if(typeof DeviceMotionEvent==="undefined"){setMotionStatus("❌ センサーAPIがありません");return}
+  setMotionStatus("🔎 診断中…iPhoneを軽く動かしてください");
+  const before=motionEvents;
+  const listener=e=>{
+    motionEvents++;
+    const a=e.acceleration||e.accelerationIncludingGravity;
+    if(a&&a.x!=null)setDebugAcceleration(Math.sqrt(a.x*a.x+a.y*a.y+a.z*a.z).toFixed(2)+" m/s²");
+  };
+  window.addEventListener("devicemotion",listener,{passive:true});
+  setTimeout(()=>{
+    window.removeEventListener("devicemotion",listener);
+    setMotionStatus(motionEvents>before?`✅ センサーOK（約${motionEvents-before}件）`:"❌ データを受信できませんでした");
+  },2000);
+}
+function handleMotion(e){
+  if(!motionRunning)return;
+  motionEvents++;
+  let a=e.acceleration,gravity=false;
+  if(!a||a.x==null){a=e.accelerationIncludingGravity;gravity=true}
+  if(!a||a.x==null)return;
+  const raw=Math.sqrt((a.x||0)**2+(a.y||0)**2+(a.z||0)**2);
+  setDebugAcceleration(raw.toFixed(2)+" m/s²");
+  let signal=raw;
+  signalMean=signalMean===0?raw:signalMean*(gravity?0.92:0.94)+raw*(gravity?0.08:0.06);
+  signal=Math.abs(raw-signalMean);
+  const now=performance.now();
+  if(motionLast===0){motionLast=now;signalPrev=signal;return}
+  const rise=signal>1.0&&signal>signalPrev;
+  if(now>=motionCooldownUntil&&rise)signalHigh=true;
+  if(signalHigh&&signal<0.55&&signalPrev>=signal&&now>=motionCooldownUntil){
+    signalHigh=false;motionCooldownUntil=now+300;
+    applyDelta(myPlayer,1);
+    setMotionStatus(`🚶 ${names[myPlayer-1]}：${state[myPlayer-1]}歩`);
+  }
+  signalPrev=signal;motionLast=now;
+}
+
+function resetGame(){
+  stopMotion();
+  if(isHost){
+    state.fill(0);render();broadcast(hostState());
+  }else if(myPlayer){
+    // リセットはホストへ依頼
+    sendToHost({type:"reset"});
+    setMessage("ホストにリセットを依頼しました。");
+  }else{
+    state.fill(0);render();
+  }
+}
+function toggleFullscreen(){
+  if(!document.fullscreenElement){document.documentElement.requestFullscreen?.()}
+  else document.exitFullscreen?.();
+}
+document.addEventListener("fullscreenchange",()=>{
+  document.body.classList.toggle("fullscreen",!!document.fullscreenElement);
+  updateCamera();
+});
+window.addEventListener("resize",updateCamera);
+window.addEventListener("error",e=>{
+  const msg=document.getElementById("message");
+  if(msg) msg.textContent="⚠️ JavaScriptエラー：Safariで開き直してください";
+});
+
+ensureAvatars();drawMarkers(0);updateNames();render();
+</script>
+</body>
+</html>
